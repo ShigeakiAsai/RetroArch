@@ -477,8 +477,21 @@ static bool write_uint32_leaf(enum sys_clk_domain dom,
 bool sys_clk_set_min_frequency(enum sys_clk_domain dom,
       sys_clk_driver_t *driver, uint32_t min_freq)
 {
-   sys_clk_state_t *st = &g_state[dom];
-   if (!write_uint32_leaf(dom, driver, st->be->file_min_policy, min_freq))
+   sys_clk_state_t *st       = &g_state[dom];
+   uint32_t         to_write = min_freq;
+   /* Translate UI sentinels at the sysfs boundary: 'Min.' (1) means
+    * "this driver's hardware minimum" and 'Max.' (~0U) means "this
+    * driver's hardware maximum". The kernel would otherwise reject
+    * or silently clamp these literal values, so we write the
+    * hardware bound. We keep the sentinel in driver->min_policy_freq
+    * so the menu label callbacks can continue to render 'Min.' /
+    * 'Max.' at the endpoints of the scale; the next sysfs refresh
+    * will replace it with the actual reported value. */
+   if (min_freq == 1)
+      to_write = driver->min_hw_freq;
+   else if (min_freq == ~0U)
+      to_write = driver->max_hw_freq;
+   if (!write_uint32_leaf(dom, driver, st->be->file_min_policy, to_write))
       return false;
    driver->min_policy_freq = min_freq;
    return true;
@@ -487,8 +500,13 @@ bool sys_clk_set_min_frequency(enum sys_clk_domain dom,
 bool sys_clk_set_max_frequency(enum sys_clk_domain dom,
       sys_clk_driver_t *driver, uint32_t max_freq)
 {
-   sys_clk_state_t *st = &g_state[dom];
-   if (!write_uint32_leaf(dom, driver, st->be->file_max_policy, max_freq))
+   sys_clk_state_t *st       = &g_state[dom];
+   uint32_t         to_write = max_freq;
+   if (max_freq == 1)
+      to_write = driver->min_hw_freq;
+   else if (max_freq == ~0U)
+      to_write = driver->max_hw_freq;
+   if (!write_uint32_leaf(dom, driver, st->be->file_max_policy, to_write))
       return false;
    driver->max_policy_freq = max_freq;
    return true;
