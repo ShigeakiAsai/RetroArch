@@ -659,6 +659,11 @@ void sys_clk_set_signal(enum sys_clk_domain dom, enum sys_clk_event event)
    if (dom >= SYS_CLK_DOMAIN_COUNT)
       return;
    st = &g_state[dom];
+   /* Bail out fast if the domain was never initialised with a real
+    * device. steer_all also checks this, but a leaf-level guard
+    * keeps the focus-event hot path cheap. */
+   if (!st->drivers)
+      return;
 
    switch (st->cur_mode)
    {
@@ -758,6 +763,12 @@ void sys_clk_set_mode(enum sys_clk_domain dom,
    if (dom >= SYS_CLK_DOMAIN_COUNT)
       return;
    st           = &g_state[dom];
+   /* If the domain has no usable driver (e.g. sys_clk_driver_init
+    * could not resolve a sysfs device), skip all work. This keeps
+    * the user's persisted settings intact instead of overwriting
+    * them with whatever default we'd otherwise produce. */
+   if (!st->drivers)
+      return;
    st->cur_mode = mode;
    if (opts)
       st->cur_opts = *opts;
@@ -845,9 +856,28 @@ void sys_clk_driver_init(enum sys_clk_domain dom)
             settings->uints.gpu_scaling_mode);
    }
 
-   /* Populate the driver tree, then enforce the mode. */
+   /* Populate the driver tree. If no usable device exists for this
+    * domain (no CPU cpufreq directories, no devfreq node, etc.),
+    * leave the state as-is: the user's saved settings stay in
+    * settings_t so they survive across boots that may include
+    * different hardware, and any subsequent sys_clk_* call is a
+    * no-op courtesy of sys_clk_domain_available checks at the
+    * call sites and the early-out in sys_clk_set_mode. */
    sys_clk_get_drivers(dom, true);
+   if (!st->drivers)
+   {
+      RARCH_LOG("[sys-clk]: domain %u has no usable device; disabling.\n",
+            (unsigned)dom);
+      return;
+   }
    sys_clk_set_mode(dom, st->cur_mode, NULL);
+}
+
+bool sys_clk_domain_available(enum sys_clk_domain dom)
+{
+   if (dom >= SYS_CLK_DOMAIN_COUNT)
+      return false;
+   return g_state[dom].drivers != NULL;
 }
 
 void sys_clk_driver_free(enum sys_clk_domain dom)

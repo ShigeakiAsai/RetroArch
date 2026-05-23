@@ -104,6 +104,9 @@
 #include "../performance_counters.h"
 #include "../setting_list.h"
 #include "../lakka.h"
+#ifdef HAVE_LAKKA
+#include "../misc/sys-clk/sys-clk.h"
+#endif
 #ifdef HAVE_LAKKA_SWITCH
 #include "../lakka-switch.h"
 #endif
@@ -20624,13 +20627,16 @@ static bool setting_append_list(
                parent_group);
 #endif
 #ifdef HAVE_LAKKA
-         CONFIG_ACTION(
-               list, list_info,
-               MENU_ENUM_LABEL_GPU_PERFPOWER,
-               MENU_ENUM_LABEL_VALUE_GPU_PERFPOWER,
-               &group_info,
-               &subgroup_info,
-               parent_group);
+         /* Only expose the GPU performance entry if the sys-clk
+          * backend found a usable GPU device on this build/host. */
+         if (sys_clk_domain_available(SYS_CLK_DOMAIN_GPU))
+            CONFIG_ACTION(
+                  list, list_info,
+                  MENU_ENUM_LABEL_GPU_PERFPOWER,
+                  MENU_ENUM_LABEL_VALUE_GPU_PERFPOWER,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group);
 #endif
 #ifndef HAVE_LAKKA
          if (frontend_driver_has_gamemode())

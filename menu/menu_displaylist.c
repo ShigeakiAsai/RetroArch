@@ -11536,6 +11536,13 @@ unsigned menu_displaylist_build_list(
 
             for (i = 0; i < ARRAY_SIZE(build_list); i++)
             {
+#ifdef HAVE_LAKKA
+               /* Skip the GPU performance entry if the sys-clk
+                * driver did not find a usable GPU on this device. */
+               if (build_list[i].enum_idx == MENU_ENUM_LABEL_GPU_PERFPOWER
+                     && !sys_clk_domain_available(SYS_CLK_DOMAIN_GPU))
+                  continue;
+#endif
                if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(list,
                         build_list[i].enum_idx,  build_list[i].parse_type,
                         false) == 0)

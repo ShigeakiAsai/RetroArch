@@ -117,6 +117,13 @@ typedef struct sys_clk_driver
 void sys_clk_driver_init(enum sys_clk_domain dom);
 void sys_clk_driver_free(enum sys_clk_domain dom);
 
+/* Returns true iff sys_clk_driver_init successfully resolved a
+ * sysfs device for this domain and at least one driver was
+ * populated. The menu uses this to hide UI entries for domains
+ * that no usable hardware backs (e.g. a desktop build with no
+ * devfreq node for the GPU). Cheap: no sysfs access. */
+bool sys_clk_domain_available(enum sys_clk_domain dom);
+
 /* Get the (NULL-terminated) list of per-policy drivers for a
  * domain. Pass can_update=true to refresh from sysfs (rate-limited
  * internally). */
