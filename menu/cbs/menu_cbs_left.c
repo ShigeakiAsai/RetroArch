@@ -780,35 +780,41 @@ static int cpu_policy_freq_tweak(unsigned type, const char *label,
 {
    sys_clk_driver_t **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
    unsigned           policyid = atoi(label);
-   uint32_t           next_freq;
+   uint32_t           cur, next_freq, intent;
+   sys_clk_driver_t  *d;
    if (!drivers)
       return 0;
+   d = drivers[policyid];
 
    switch (type)
    {
       case MENU_SETTINGS_CPU_POLICY_SET_MINFREQ:
+         /* If we are sitting on an endpoint sentinel, feed the
+          * sentinel back into the stepper so it stays put (left
+          * from "Min." remains "Min.") or steps off correctly
+          * (left from "Max." returns the next concrete value
+          * below abs_max_freq). */
+         intent    = sys_clk_get_min_intent(SYS_CLK_DOMAIN_CPU, d);
+         cur       = intent ? intent : d->min_policy_freq;
          next_freq = sys_clk_get_next_frequency(SYS_CLK_DOMAIN_CPU,
-               drivers[policyid],
-               drivers[policyid]->min_policy_freq, -1);
-         sys_clk_set_min_frequency(SYS_CLK_DOMAIN_CPU,
-               drivers[policyid], next_freq);
+               d, cur, -1);
+         sys_clk_set_min_frequency(SYS_CLK_DOMAIN_CPU, d, next_freq);
          break;
       case MENU_SETTINGS_CPU_POLICY_SET_MAXFREQ:
+         intent    = sys_clk_get_max_intent(SYS_CLK_DOMAIN_CPU, d);
+         cur       = intent ? intent : d->max_policy_freq;
          next_freq = sys_clk_get_next_frequency(SYS_CLK_DOMAIN_CPU,
-               drivers[policyid],
-               drivers[policyid]->max_policy_freq, -1);
-         sys_clk_set_max_frequency(SYS_CLK_DOMAIN_CPU,
-               drivers[policyid], next_freq);
+               d, cur, -1);
+         sys_clk_set_max_frequency(SYS_CLK_DOMAIN_CPU, d, next_freq);
          break;
       case MENU_SETTINGS_CPU_POLICY_SET_GOVERNOR:
          {
-            int pidx = string_list_find_elem(drivers[policyid]->available_governors,
-                  drivers[policyid]->scaling_governor);
+            int pidx = string_list_find_elem(d->available_governors,
+                  d->scaling_governor);
             if (pidx > 1)
             {
-               sys_clk_set_governor(SYS_CLK_DOMAIN_CPU,
-                     drivers[policyid],
-                     drivers[policyid]->available_governors->elems[pidx-2].data);
+               sys_clk_set_governor(SYS_CLK_DOMAIN_CPU, d,
+                     d->available_governors->elems[pidx-2].data);
             }
             break;
          }

@@ -691,13 +691,18 @@ static size_t menu_action_cpu_freq_label(
    sys_clk_driver_t **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
    sys_clk_driver_t  *d       = drivers[policyid];
    uint32_t           freq;
+   uint32_t           intent;
 
    switch (type)
    {
       case MENU_SETTINGS_CPU_POLICY_SET_MINFREQ:
          strlcpy(s2, msg_hash_to_str(
                   MENU_ENUM_LABEL_VALUE_CPU_POLICY_MIN_FREQ), len2);
-         freq = d->min_policy_freq;
+         /* If the user parked this slider at an endpoint, display
+          * the sentinel persistently even though the underlying
+          * sysfs value has been refreshed to a concrete frequency. */
+         intent = sys_clk_get_min_intent(SYS_CLK_DOMAIN_CPU, d);
+         freq   = intent ? intent : d->min_policy_freq;
          if (freq == 1)
             return strlcpy(s, "Min.", len);
          if (freq == ~0U)
@@ -706,7 +711,8 @@ static size_t menu_action_cpu_freq_label(
       case MENU_SETTINGS_CPU_POLICY_SET_MAXFREQ:
          strlcpy(s2, msg_hash_to_str(
                   MENU_ENUM_LABEL_VALUE_CPU_POLICY_MAX_FREQ), len2);
-         freq = d->max_policy_freq;
+         intent = sys_clk_get_max_intent(SYS_CLK_DOMAIN_CPU, d);
+         freq   = intent ? intent : d->max_policy_freq;
          if (freq == 1)
             return strlcpy(s, "Min.", len);
          if (freq == ~0U)

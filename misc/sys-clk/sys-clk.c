@@ -71,6 +71,12 @@ typedef struct sys_clk_backend
    const char *gov_powersave;
 } sys_clk_backend_t;
 
+/* Maximum policy_id we keep per-policy "intent" overrides for. The
+ * cpufreq layer numbers policies 0..N-1; 16 is more than any
+ * RetroArch-relevant host. Policies above this index simply don't
+ * get sentinel overrides (they'll always display the actual freq). */
+#define SYS_CLK_MAX_POLICIES 16
+
 /* Per-domain state. Holds the live driver list, current user-selected
  * mode and options, and a precomputed absolute frequency range
  * across all drivers in the domain. */
@@ -83,6 +89,18 @@ typedef struct sys_clk_state
    sys_clk_opts_t           cur_opts;
    uint32_t                 abs_min_freq;
    uint32_t                 abs_max_freq;
+   /* Per-policy endpoint-sentinel "intent" overrides. A non-zero
+    * value (1 = "Min.", ~0U = "Max.") means the user dragged this
+    * slider to a scale endpoint; the menu label callbacks consult
+    * these and display the sentinel even after the per-driver
+    * min_policy_freq / max_policy_freq fields have been refreshed
+    * from sysfs (which always returns a concrete frequency, never
+    * a sentinel). Set by sys_clk_set_min_frequency /
+    * sys_clk_set_max_frequency, cleared the moment the user steps
+    * off the endpoint. Survives driver-list refresh because it
+    * lives in the state, not in the per-driver struct. */
+   uint32_t                 min_intent[SYS_CLK_MAX_POLICIES];
+   uint32_t                 max_intent[SYS_CLK_MAX_POLICIES];
 } sys_clk_state_t;
 
 /* CPU backend: standard Linux cpufreq sysfs. */
@@ -248,6 +266,22 @@ static sys_clk_driver_t *read_one_driver(sys_clk_state_t *st,
    }
    else
       drv->max_hw_freq = drv->max_policy_freq;
+
+   /* Infer the endpoint-sentinel intent from the loaded policy:
+    * if the policy bound matches the hardware bound, treat the
+    * slider as parked at the endpoint. This is what makes "Min."
+    * / "Max." persist across launches without storing the intent
+    * in settings, and across the in-process sysfs cache refresh
+    * (which frees and re-reads the driver list). A subsequent
+    * sys_clk_set_min_frequency / sys_clk_set_max_frequency call
+    * with a concrete frequency will clear the intent. */
+   if (drv->policy_id < SYS_CLK_MAX_POLICIES)
+   {
+      if (drv->min_policy_freq && drv->min_policy_freq == drv->min_hw_freq)
+         st->min_intent[drv->policy_id] = 1;
+      if (drv->max_policy_freq && drv->max_policy_freq == drv->max_hw_freq)
+         st->max_intent[drv->policy_id] = ~0U;
+   }
 
    /* Track the absolute range across all drivers in the domain. */
    if (drv->min_hw_freq &&
@@ -483,17 +517,25 @@ bool sys_clk_set_min_frequency(enum sys_clk_domain dom,
     * "this driver's hardware minimum" and 'Max.' (~0U) means "this
     * driver's hardware maximum". The kernel would otherwise reject
     * or silently clamp these literal values, so we write the
-    * hardware bound. We keep the sentinel in driver->min_policy_freq
-    * so the menu label callbacks can continue to render 'Min.' /
-    * 'Max.' at the endpoints of the scale; the next sysfs refresh
-    * will replace it with the actual reported value. */
+    * hardware bound. The sentinel itself is recorded in the
+    * per-policy intent table below so the menu label callbacks can
+    * keep rendering 'Min.' / 'Max.' at the endpoints of the scale
+    * even after sys_clk_get_drivers refreshes driver->min_policy_freq
+    * from sysfs (sysfs only ever reports concrete frequencies). */
    if (min_freq == 1)
       to_write = driver->min_hw_freq;
    else if (min_freq == ~0U)
       to_write = driver->max_hw_freq;
    if (!write_uint32_leaf(dom, driver, st->be->file_min_policy, to_write))
       return false;
-   driver->min_policy_freq = min_freq;
+   driver->min_policy_freq = to_write;
+   /* Record (or clear) the endpoint intent so the display layer
+    * survives subsequent sysfs cache refreshes. Stepping off an
+    * endpoint passes a concrete frequency here, which clears the
+    * intent and restores normal "%u MHz" display. */
+   if (driver->policy_id < SYS_CLK_MAX_POLICIES)
+      st->min_intent[driver->policy_id] =
+         (min_freq == 1 || min_freq == ~0U) ? min_freq : 0;
    return true;
 }
 
@@ -508,7 +550,10 @@ bool sys_clk_set_max_frequency(enum sys_clk_domain dom,
       to_write = driver->max_hw_freq;
    if (!write_uint32_leaf(dom, driver, st->be->file_max_policy, to_write))
       return false;
-   driver->max_policy_freq = max_freq;
+   driver->max_policy_freq = to_write;
+   if (driver->policy_id < SYS_CLK_MAX_POLICIES)
+      st->max_intent[driver->policy_id] =
+         (max_freq == 1 || max_freq == ~0U) ? max_freq : 0;
    return true;
 }
 
@@ -530,6 +575,24 @@ bool sys_clk_set_governor(enum sys_clk_domain dom,
    driver->scaling_governor = strdup(governor);
    st->last_update = 0;
    return true;
+}
+
+uint32_t sys_clk_get_min_intent(enum sys_clk_domain dom,
+      const sys_clk_driver_t *driver)
+{
+   if (dom >= SYS_CLK_DOMAIN_COUNT || !driver
+         || driver->policy_id >= SYS_CLK_MAX_POLICIES)
+      return 0;
+   return g_state[dom].min_intent[driver->policy_id];
+}
+
+uint32_t sys_clk_get_max_intent(enum sys_clk_domain dom,
+      const sys_clk_driver_t *driver)
+{
+   if (dom >= SYS_CLK_DOMAIN_COUNT || !driver
+         || driver->policy_id >= SYS_CLK_MAX_POLICIES)
+      return 0;
+   return g_state[dom].max_intent[driver->policy_id];
 }
 
 /* ------------------------------------------------------------------ */

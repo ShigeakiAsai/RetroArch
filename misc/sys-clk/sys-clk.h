@@ -139,6 +139,18 @@ bool sys_clk_set_max_frequency(enum sys_clk_domain dom,
 bool sys_clk_set_governor(enum sys_clk_domain dom,
       sys_clk_driver_t *driver, const char *governor);
 
+/* Return the user's last-set endpoint-sentinel intent for a given
+ * driver's min/max policy frequency, or 0 if the user has not
+ * parked the slider at an endpoint. The menu uses this so a
+ * slider sitting at 'Min.' / 'Max.' keeps rendering that label
+ * across sysfs cache refreshes (which always report a concrete
+ * frequency, never a sentinel). The return value is one of
+ * 0, 1 (= 'Min.'), or ~0U (= 'Max.'). */
+uint32_t sys_clk_get_min_intent(enum sys_clk_domain dom,
+      const sys_clk_driver_t *driver);
+uint32_t sys_clk_get_max_intent(enum sys_clk_domain dom,
+      const sys_clk_driver_t *driver);
+
 /* Step to the next/previous frequency. The "table" variant uses
  * driver->available_freqs when present and produces sentinel values
  * (1, ~0U) for "Min." / "Max." so the UI can render them. The

@@ -905,35 +905,41 @@ static int cpu_policy_freq_tweak(unsigned type, const char *label,
 
    if (drivers)
    {
-      uint32_t next_freq;
-      unsigned policyid = atoi(label);
+      uint32_t          next_freq;
+      uint32_t          cur;
+      uint32_t          intent;
+      unsigned          policyid = atoi(label);
+      sys_clk_driver_t *d        = drivers[policyid];
       switch (type)
       {
          case MENU_SETTINGS_CPU_POLICY_SET_MINFREQ:
+            /* Mirror the left-action treatment: when sitting on an
+             * endpoint sentinel, feed it back into the stepper so
+             * "Min." stays "Min." on a right press (clamped) and a
+             * right press from "Max." returns ~0U as expected. */
+            intent    = sys_clk_get_min_intent(SYS_CLK_DOMAIN_CPU, d);
+            cur       = intent ? intent : d->min_policy_freq;
             next_freq = sys_clk_get_next_frequency(SYS_CLK_DOMAIN_CPU,
-                  drivers[policyid],
-                  drivers[policyid]->min_policy_freq, 1);
-            sys_clk_set_min_frequency(SYS_CLK_DOMAIN_CPU,
-                  drivers[policyid], next_freq);
+                  d, cur, 1);
+            sys_clk_set_min_frequency(SYS_CLK_DOMAIN_CPU, d, next_freq);
             break;
          case MENU_SETTINGS_CPU_POLICY_SET_MAXFREQ:
+            intent    = sys_clk_get_max_intent(SYS_CLK_DOMAIN_CPU, d);
+            cur       = intent ? intent : d->max_policy_freq;
             next_freq = sys_clk_get_next_frequency(SYS_CLK_DOMAIN_CPU,
-                  drivers[policyid],
-                  drivers[policyid]->max_policy_freq, 1);
-            sys_clk_set_max_frequency(SYS_CLK_DOMAIN_CPU,
-                  drivers[policyid], next_freq);
+                  d, cur, 1);
+            sys_clk_set_max_frequency(SYS_CLK_DOMAIN_CPU, d, next_freq);
             break;
          case MENU_SETTINGS_CPU_POLICY_SET_GOVERNOR:
             {
-               int pidx = string_list_find_elem(drivers[policyid]->available_governors,
-                     drivers[policyid]->scaling_governor);
+               int pidx = string_list_find_elem(d->available_governors,
+                     d->scaling_governor);
                /* See cpu_policy_freq_managed_gov above for the
                 * 1-based vs 0-based reasoning. */
-               if (pidx && pidx < (int)drivers[policyid]->available_governors->size)
+               if (pidx && pidx < (int)d->available_governors->size)
                {
-                  sys_clk_set_governor(SYS_CLK_DOMAIN_CPU,
-                        drivers[policyid],
-                        drivers[policyid]->available_governors->elems[pidx].data);
+                  sys_clk_set_governor(SYS_CLK_DOMAIN_CPU, d,
+                        d->available_governors->elems[pidx].data);
                }
                break;
             }
