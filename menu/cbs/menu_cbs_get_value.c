@@ -46,10 +46,8 @@
 #endif
 #include "../../playlist.h"
 #include "../../manual_content_scan.h"
-#include "../misc/cpufreq/cpufreq.h"
-
-#ifdef HAVE_LAKKA_SWITCH
-#include "../misc/gpufreq/gpufreq.h"
+#ifdef HAVE_LAKKA
+#include "../misc/sys-clk/sys-clk.h"
 #endif
 
 #include "../../audio/audio_driver.h"
@@ -590,7 +588,7 @@ static size_t menu_action_setting_disp_cpu_gov_mode(
    const char *alt        = list->list[i].alt
          ? list->list[i].alt
          : list->list[i].path;
-   enum cpu_scaling_mode mode = get_cpu_scaling_mode(NULL);
+   enum sys_clk_mode mode = sys_clk_get_mode(SYS_CLK_DOMAIN_CPU, NULL);
    if (alt)
       strlcpy(s2, alt, len2);
    return strlcpy(s, msg_hash_to_str(
@@ -605,12 +603,12 @@ static size_t menu_action_setting_disp_cpu_gov_choose(
       const char *path,
       char *s2, size_t len2)
 {
-   cpu_scaling_opts_t opts;
+   sys_clk_opts_t opts;
    const char *alt            = list->list[i].alt
          ? list->list[i].alt
          : list->list[i].path;
    int fnum                   = atoi(list->list[i].label);
-   enum cpu_scaling_mode mode = get_cpu_scaling_mode(&opts);
+   (void)sys_clk_get_mode(SYS_CLK_DOMAIN_CPU, &opts);
 
    if (alt)
       strlcpy(s2, alt, len2);
@@ -628,10 +626,10 @@ static size_t menu_action_setting_disp_set_label_cpu_policy(
       const char *path,
       char *s2, size_t len2)
 {
-   unsigned policyid              = atoi(path);
-   cpu_scaling_driver_t **drivers = get_cpu_scaling_drivers(false);
-   cpu_scaling_driver_t *d        = drivers[policyid];
-   size_t _len                    = snprintf(s2, len2, "%s %d",
+   unsigned policyid          = atoi(path);
+   sys_clk_driver_t **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
+   sys_clk_driver_t *d        = drivers[policyid];
+   size_t _len                = snprintf(s2, len2, "%s %d",
          msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CPU_POLICY_ENTRY),
          policyid);
 
@@ -656,9 +654,9 @@ static size_t menu_action_cpu_managed_freq_label(
       const char *path,
       char *s2, size_t len2)
 {
-   cpu_scaling_opts_t opts;
-   uint32_t freq              = 0;
-   enum cpu_scaling_mode mode = get_cpu_scaling_mode(&opts);
+   sys_clk_opts_t opts;
+   uint32_t freq = 0;
+   (void)sys_clk_get_mode(SYS_CLK_DOMAIN_CPU, &opts);
 
    switch (type)
    {
@@ -689,9 +687,9 @@ static size_t menu_action_cpu_freq_label(
       const char *path,
       char *s2, size_t len2)
 {
-   unsigned              policyid = atoi(path);
-   cpu_scaling_driver_t **drivers = get_cpu_scaling_drivers(false);
-   cpu_scaling_driver_t        *d = drivers[policyid];
+   unsigned          policyid = atoi(path);
+   sys_clk_driver_t **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
+   sys_clk_driver_t  *d       = drivers[policyid];
 
    switch (type)
    {
@@ -719,16 +717,31 @@ static size_t menu_action_cpu_governor_label(
       const char *path,
       char *s2, size_t len2)
 {
-   unsigned policyid = atoi(path);
-   cpu_scaling_driver_t **drivers = get_cpu_scaling_drivers(false);
-   cpu_scaling_driver_t *d = drivers[policyid];
+   unsigned          policyid = atoi(path);
+   sys_clk_driver_t **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
+   sys_clk_driver_t  *d       = drivers[policyid];
 
    strlcpy(s2, msg_hash_to_str(
       MENU_ENUM_LABEL_VALUE_CPU_POLICY_GOVERNOR), len2);
    return strlcpy(s, d->scaling_governor, len);
 }
 #endif
-#ifdef HAVE_LAKKA_SWITCH
+#ifdef HAVE_LAKKA
+/* The GPU-mode string labels are laid out in the legacy order
+ * (MANAGED, MAX, MIN, BALANCED). Since SYS_CLK_MODE_* is laid out
+ * in CPU order, translate the mode index used for label lookup. */
+static int sys_clk_mode_to_gpu_label_index(enum sys_clk_mode m)
+{
+   switch (m)
+   {
+      case SYS_CLK_MODE_MANAGED_PERFORMANCE: return 0;
+      case SYS_CLK_MODE_MAX_PERFORMANCE:     return 1;
+      case SYS_CLK_MODE_MIN_POWER:           return 2;
+      case SYS_CLK_MODE_BALANCED:            return 3;
+      default:                               return 0;
+   }
+}
+
 static void menu_action_setting_disp_gpu_gov_mode(
       file_list_t* list,
       unsigned *w, unsigned type, unsigned i,
@@ -740,13 +753,14 @@ static void menu_action_setting_disp_gpu_gov_mode(
    const char *alt        = list->list[i].alt
          ? list->list[i].alt
          : list->list[i].path;
-   enum gpu_scaling_mode mode = get_gpu_scaling_mode(NULL);
+   enum sys_clk_mode mode = sys_clk_get_mode(SYS_CLK_DOMAIN_GPU, NULL);
 
    if (alt)
       strlcpy(s2, alt, len2);
 
    strlcpy(s, msg_hash_to_str(
-      MENU_ENUM_LABEL_VALUE_GPU_PERF_MODE_MANAGED_PERF + (int)mode), len);
+      MENU_ENUM_LABEL_VALUE_GPU_PERF_MODE_MANAGED_PERF
+         + sys_clk_mode_to_gpu_label_index(mode)), len);
 }
 
 static void menu_action_gpu_managed_freq_label(
@@ -757,9 +771,9 @@ static void menu_action_gpu_managed_freq_label(
       const char *path,
       char *s2, size_t len2)
 {
-   gpu_scaling_opts_t opts;
-   uint32_t freq              = 0;
-   enum gpu_scaling_mode mode = get_gpu_scaling_mode(&opts);
+   sys_clk_opts_t opts;
+   uint32_t freq = 0;
+   (void)sys_clk_get_mode(SYS_CLK_DOMAIN_GPU, &opts);
 
    switch (type)
    {
@@ -2141,7 +2155,7 @@ static int menu_cbs_init_bind_get_string_representation_compare_label(
             BIND_ACTION_GET_VALUE(cbs,
                   menu_action_setting_disp_set_label_manual_content_scan_core_name);
             break;
-#ifdef HAVE_LAKKA_SWITCH
+#ifdef HAVE_LAKKA
          case MENU_ENUM_LABEL_GPU_PERF_MODE:
             BIND_ACTION_GET_VALUE(cbs,
                   menu_action_setting_disp_gpu_gov_mode);

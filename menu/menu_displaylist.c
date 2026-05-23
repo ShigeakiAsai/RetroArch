@@ -130,12 +130,7 @@
 #include "../manual_content_scan.h"
 #include "../core_backup.h"
 #ifdef HAVE_LAKKA
-#include "../misc/cpufreq/cpufreq.h"
-
-#ifdef HAVE_LAKKA_SWITCH
-#include "../misc/gpufreq/gpufreq.h"
-#endif
-
+#include "../misc/sys-clk/sys-clk.h"
 #endif
 #include "../input/input_remapping.h"
 
@@ -11271,7 +11266,7 @@ unsigned menu_displaylist_build_list(
                {MENU_ENUM_LABEL_SUSTAINED_PERFORMANCE_MODE, PARSE_ONLY_BOOL},
                {MENU_ENUM_LABEL_CPU_PERFPOWER,              PARSE_ACTION},
 
-#ifdef HAVE_LAKKA_SWITCH
+#ifdef HAVE_LAKKA
                {MENU_ENUM_LABEL_GPU_PERFPOWER,              PARSE_ACTION},
 #endif
 #ifdef HAVE_LAKKA
@@ -12911,7 +12906,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             break;
          case DISPLAYLIST_CPU_PERFPOWER_LIST:
             {
-               cpu_scaling_driver_t **drivers = get_cpu_scaling_drivers(true);
+               sys_clk_driver_t **drivers = sys_clk_get_drivers(
+                     SYS_CLK_DOMAIN_CPU, true);
                menu_entries_clear(info->list);
                if (drivers)
                {
@@ -12923,9 +12919,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                         MENU_ENUM_LABEL_CPU_PERF_MODE,
                         0, 0, 0, NULL);
 
-                  switch (get_cpu_scaling_mode(NULL))
+                  switch (sys_clk_get_mode(SYS_CLK_DOMAIN_CPU, NULL))
                   {
-                     case CPUSCALING_MANUAL:
+                     case SYS_CLK_MODE_MANUAL:
                         while (*drivers)
                         {
                            char policyid[16];
@@ -12938,7 +12934,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                            drivers++;
                         }
                         break;
-                     case CPUSCALING_MANAGED_PER_CONTEXT:
+                     case SYS_CLK_MODE_MANAGED_PER_CONTEXT:
                         /* Allows user to pick two governors */
                         menu_entries_append(info->list,
                               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CPU_POLICY_CORE_GOVERNOR),
@@ -12953,7 +12949,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                               0, 0, 0, NULL);
 
                         /* fallthrough */
-                     case CPUSCALING_MANAGED_PERFORMANCE:
+                     case SYS_CLK_MODE_MANAGED_PERFORMANCE:
                         /* Allow users to choose max/min frequencies */
                         menu_entries_append(info->list,
                               "0",
@@ -12970,9 +12966,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                               0, 0, NULL);
 
                         break;
-                     case CPUSCALING_MAX_PERFORMANCE:
-                     case CPUSCALING_MIN_POWER:
-                     case CPUSCALING_BALANCED:
+                     case SYS_CLK_MODE_MAX_PERFORMANCE:
+                     case SYS_CLK_MODE_MIN_POWER:
+                     case SYS_CLK_MODE_BALANCED:
                         /* No settings for these modes */
                         break;
                   }
@@ -12984,24 +12980,23 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                break;
             }
 #endif
-#ifdef HAVE_LAKKA_SWITCH
+#ifdef HAVE_LAKKA
       case DISPLAYLIST_GPU_PERFPOWER_LIST:
       {
-         gpu_scaling_driver_t **drivers = get_gpu_scaling_drivers(true);
+         sys_clk_driver_t **drivers = sys_clk_get_drivers(
+               SYS_CLK_DOMAIN_GPU, true);
          menu_entries_clear(info->list);
          if (drivers)
          {
-            int count = 0;
-
             menu_entries_append(info->list,
                msg_hash_to_str(MENU_ENUM_LABEL_VALUE_GPU_PERF_MODE),
                msg_hash_to_str(MENU_ENUM_LABEL_GPU_PERF_MODE),
                MENU_ENUM_LABEL_GPU_PERF_MODE,
                0, 0, 0, NULL);
 
-            switch (get_gpu_scaling_mode(NULL))
+            switch (sys_clk_get_mode(SYS_CLK_DOMAIN_GPU, NULL))
             {
-               case GPUSCALING_MANAGED_PERFORMANCE:
+               case SYS_CLK_MODE_MANAGED_PERFORMANCE:
                   /* Allow users to choose max/min frequencies */
                   menu_entries_append(info->list,
                         "0",
@@ -13018,12 +13013,10 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                         0, 0, NULL);
 
                   break;
-               case GPUSCALING_MAX_PERFORMANCE:
-               case GPUSCALING_MIN_POWER:
-               case GPUSCALING_BALANCED:
-                  /* No settings for these modes */
+               default:
+                  /* No per-entry settings for the non-managed modes */
                   break;
-            };
+            }
          }
 
          info->flags       |= MD_FLAG_NEED_REFRESH

@@ -201,10 +201,7 @@
 #include "bluetooth/bluetooth_driver.h"
 #endif
 #ifdef HAVE_LAKKA
-#include "misc/cpufreq/cpufreq.h"
-#ifdef HAVE_LAKKA_SWITCH
-#include "misc/gpufreq/gpufreq.h"
-#endif
+#include "misc/sys-clk/sys-clk.h"
 #endif
 #include "led/led_driver.h"
 #include "midi_driver.h"
@@ -4883,12 +4880,8 @@ void runloop_pause_checks(void)
 #endif
 
 #ifdef HAVE_LAKKA
-      set_cpu_scaling_signal(CPUSCALING_EVENT_FOCUS_MENU);
-
-#ifdef HAVE_LAKKA_SWITCH
-      set_gpu_scaling_signal(GPUSCALING_EVENT_FOCUS_MENU);
-#endif
-
+      sys_clk_set_signal(SYS_CLK_DOMAIN_CPU, SYS_CLK_EVENT_FOCUS_MENU);
+      sys_clk_set_signal(SYS_CLK_DOMAIN_GPU, SYS_CLK_EVENT_FOCUS_MENU);
 #endif
 
       /* Limit paused frames to video refresh. */
@@ -4900,12 +4893,8 @@ void runloop_pause_checks(void)
    else
    {
 #ifdef HAVE_LAKKA
-      set_cpu_scaling_signal(CPUSCALING_EVENT_FOCUS_CORE);
-
-#ifdef HAVE_LAKKA_SWITCH
-      set_gpu_scaling_signal(GPUSCALING_EVENT_FOCUS_CORE);
-#endif
-
+      sys_clk_set_signal(SYS_CLK_DOMAIN_CPU, SYS_CLK_EVENT_FOCUS_CORE);
+      sys_clk_set_signal(SYS_CLK_DOMAIN_GPU, SYS_CLK_EVENT_FOCUS_CORE);
 #endif
 
       /* Restore frame limit. */

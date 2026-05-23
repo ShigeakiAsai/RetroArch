@@ -16607,7 +16607,7 @@ MSG_HASH(
    MENU_ENUM_LABEL_HELP_TIMEZONE,
    "Displays a list of available timezones. After selecting a time zone, time and date is adjusted to the selected time zone. It assumes, that system/hardware clock is set to UTC."
    )
-#ifdef HAVE_LAKKA_SWITCH
+#ifdef HAVE_LAKKA
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_GPU_PERFPOWER,
    "GPU Performance and Power"
@@ -16656,6 +16656,8 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_GPU_MANAGED_MAX_FREQ,
    "Maximum Core Frequency"
    )
+#endif
+#ifdef HAVE_LAKKA_SWITCH
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_LAKKA_SWITCH_OPTIONS,
    "Nintendo Switch Options"

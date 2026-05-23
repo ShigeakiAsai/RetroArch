@@ -20623,7 +20623,7 @@ static bool setting_append_list(
                &subgroup_info,
                parent_group);
 #endif
-#ifdef HAVE_LAKKA_SWITCH
+#ifdef HAVE_LAKKA
          CONFIG_ACTION(
                list, list_info,
                MENU_ENUM_LABEL_GPU_PERFPOWER,

@@ -191,10 +191,7 @@
 #include "bluetooth/bluetooth_driver.h"
 #endif
 #ifdef HAVE_LAKKA
-#include "misc/cpufreq/cpufreq.h"
-#ifdef HAVE_LAKKA_SWITCH
-#include "misc/gpufreq/gpufreq.h"
-#endif
+#include "misc/sys-clk/sys-clk.h"
 #endif
 #include "led/led_driver.h"
 #include "midi_driver.h"
@@ -1775,12 +1772,8 @@ void drivers_init(
       midi_driver_init(settings);
 
 #ifdef HAVE_LAKKA
-   cpu_scaling_driver_init();
-
-#ifdef HAVE_LAKKA_SWITCH
-   gpu_scaling_driver_init();
-#endif
-
+   sys_clk_driver_init(SYS_CLK_DOMAIN_CPU);
+   sys_clk_driver_init(SYS_CLK_DOMAIN_GPU);
 #endif
 
 #ifdef HAVE_MENU
@@ -1885,12 +1878,8 @@ void driver_uninit(int flags, enum driver_lifetime_flags lifetime_flags)
       midi_driver_free();
 
 #ifdef HAVE_LAKKA
-   cpu_scaling_driver_free();
-
-#ifdef HAVE_LAKKA_SWITCH
-   gpu_scaling_driver_free();
-#endif
-
+   sys_clk_driver_free(SYS_CLK_DOMAIN_CPU);
+   sys_clk_driver_free(SYS_CLK_DOMAIN_GPU);
 #endif
 }
 

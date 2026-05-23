@@ -1299,7 +1299,7 @@ MSG_HASH(
    "deferred_menu_settings_list"
    )
 
-#ifdef HAVE_LAKKA_SWITCH
+#ifdef HAVE_LAKKA
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_GPU_PERFPOWER_LIST,
    "deferred_gpu_perfpower_list"
@@ -6381,7 +6381,7 @@ MSG_HASH(
    MENU_ENUM_LABEL_QUICK_MENU_SHOW_RESUME_CONTENT,
    "quick_menu_show_resume_content"
    )
-#ifdef HAVE_LAKKA_SWITCH
+#ifdef HAVE_LAKKA
 MSG_HASH(
    MENU_ENUM_LABEL_GPU_PERFPOWER,
    "gpu_perfpower_list"

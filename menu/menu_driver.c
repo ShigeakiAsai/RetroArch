@@ -72,12 +72,7 @@
 #include "../performance_counters.h"
 #include "../version.h"
 #ifdef HAVE_LAKKA
-#include "../misc/cpufreq/cpufreq.h"
-
-#ifdef HAVE_LAKKA_SWITCH
-#include "../misc/gpufreq/gpufreq.h"
-#endif
-
+#include "../misc/sys-clk/sys-clk.h"
 #endif
 #ifdef HAVE_LIBNX
 #include <switch.h>
@@ -6503,10 +6498,8 @@ void menu_driver_toggle(
    if (on)
    {
 #ifdef HAVE_LAKKA
-      set_cpu_scaling_signal(CPUSCALING_EVENT_FOCUS_MENU);
-#ifdef HAVE_LAKKA_SWITCH
-      set_gpu_scaling_signal(GPUSCALING_EVENT_FOCUS_MENU);
-#endif
+      sys_clk_set_signal(SYS_CLK_DOMAIN_CPU, SYS_CLK_EVENT_FOCUS_MENU);
+      sys_clk_set_signal(SYS_CLK_DOMAIN_GPU, SYS_CLK_EVENT_FOCUS_MENU);
 #endif
 #ifdef HAVE_OVERLAY
       /* If an overlay was displayed before the toggle
@@ -6527,10 +6520,8 @@ void menu_driver_toggle(
    else
    {
 #ifdef HAVE_LAKKA
-      set_cpu_scaling_signal(CPUSCALING_EVENT_FOCUS_CORE);
-#ifdef HAVE_LAKKA_SWITCH
-      set_gpu_scaling_signal(GPUSCALING_EVENT_FOCUS_CORE);
-#endif
+      sys_clk_set_signal(SYS_CLK_DOMAIN_CPU, SYS_CLK_EVENT_FOCUS_CORE);
+      sys_clk_set_signal(SYS_CLK_DOMAIN_GPU, SYS_CLK_EVENT_FOCUS_CORE);
 #endif
 #ifdef HAVE_OVERLAY
       /* Inhibits pointer 'select' and 'cancel' actions

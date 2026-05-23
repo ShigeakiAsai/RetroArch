@@ -35,9 +35,8 @@
 #ifdef HAVE_BLUETOOTH
 #include "../../bluetooth/bluetooth_driver.h"
 #endif
-#include "../../misc/cpufreq/cpufreq.h"
-#ifdef HAVE_LAKKA_SWITCH
-#include "../../misc/gpufreq/gpufreq.h"
+#ifdef HAVE_LAKKA
+#include "../../misc/sys-clk/sys-clk.h"
 #endif
 #ifdef HAVE_NETWORKING
 #include "../../network/netplay/netplay.h"
@@ -1517,7 +1516,7 @@ static int action_bind_sublabel_cpu_policy_entry_list(
       char *s, size_t len)
 {
    /* Displays info about the Policy entry */
-   cpu_scaling_driver_t **drivers = get_cpu_scaling_drivers(false);
+   sys_clk_driver_t **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
    if (drivers)
    {
       int idx     = atoi(path);
@@ -1536,23 +1535,32 @@ static int action_bind_sublabel_cpu_perf_mode(
       char *s, size_t len)
 {
    /* Displays info about the mode selected */
-   enum cpu_scaling_mode mode = get_cpu_scaling_mode(NULL);
+   enum sys_clk_mode mode = sys_clk_get_mode(SYS_CLK_DOMAIN_CPU, NULL);
    strlcpy(s, msg_hash_to_str(
       MENU_ENUM_SUBLABEL_VALUE_CPU_PERF_MODE_MANAGED_PERF + (int)mode), len);
    return 0;
 }
-#endif
-#ifdef HAVE_LAKKA_SWITCH
+
 static int action_bind_sublabel_gpu_perf_mode(
       file_list_t *list,
       unsigned type, unsigned i,
       const char *label, const char *path,
       char *s, size_t len)
 {
-   /* Displays info about the mode selected */
-   enum gpu_scaling_mode mode = get_gpu_scaling_mode(NULL);
+   /* Displays info about the mode selected. GPU sublabel strings
+    * use the legacy GPU-mode ordering (MANAGED, MAX, MIN, BALANCED). */
+   enum sys_clk_mode mode = sys_clk_get_mode(SYS_CLK_DOMAIN_GPU, NULL);
+   int idx;
+   switch (mode)
+   {
+      case SYS_CLK_MODE_MANAGED_PERFORMANCE: idx = 0; break;
+      case SYS_CLK_MODE_MAX_PERFORMANCE:     idx = 1; break;
+      case SYS_CLK_MODE_MIN_POWER:           idx = 2; break;
+      case SYS_CLK_MODE_BALANCED:            idx = 3; break;
+      default:                               idx = 0; break;
+   }
    strlcpy(s, msg_hash_to_str(
-      MENU_ENUM_SUBLABEL_VALUE_GPU_PERF_MODE_MANAGED_PERF + (int)mode), len);
+      MENU_ENUM_SUBLABEL_VALUE_GPU_PERF_MODE_MANAGED_PERF + idx), len);
    return 0;
 }
 #endif
@@ -5513,6 +5521,8 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
          case MENU_ENUM_LABEL_BLUETOOTH_ERTM_DISABLE:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_bluetooth_ertm_disable);
             break;
+#endif
+#ifdef HAVE_LAKKA
          case MENU_ENUM_LABEL_GPU_PERF_MODE:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_gpu_perf_mode);
             break;

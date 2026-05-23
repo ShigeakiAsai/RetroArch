@@ -47,9 +47,8 @@
 #endif
 #include "../../playlist.h"
 #include "../../manual_content_scan.h"
-#include "../misc/cpufreq/cpufreq.h"
-#ifdef HAVE_LAKKA_SWITCH
-#include "../misc/gpufreq/gpufreq.h"
+#ifdef HAVE_LAKKA
+#include "../misc/sys-clk/sys-clk.h"
 #endif
 #ifndef BIND_ACTION_RIGHT
 #define BIND_ACTION_RIGHT(cbs, name) (cbs)->action_right = (name)
@@ -794,14 +793,53 @@ static int manual_content_scan_core_name_right(unsigned type, const char *label,
 }
 
 #ifdef HAVE_LAKKA
+/* See the matching helper in menu_cbs_left.c. */
+static int sys_clk_left_right_managed_tweak(enum sys_clk_domain dom,
+      unsigned type, int direction,
+      unsigned min_kind, unsigned max_kind)
+{
+   sys_clk_opts_t      opts;
+   enum sys_clk_mode   mode    = sys_clk_get_mode(dom, &opts);
+   sys_clk_driver_t  **drivers = sys_clk_get_drivers(dom, false);
+   sys_clk_driver_t   *d;
+
+   if (!drivers || !drivers[0])
+      return 0;
+   d = drivers[0];
+
+   if (type == min_kind)
+   {
+      if (d->available_freqs && d->available_freqs[0])
+         opts.min_freq = sys_clk_get_next_frequency(dom, d,
+               opts.min_freq, direction);
+      else
+         opts.min_freq = sys_clk_get_next_frequency_limit(dom,
+               opts.min_freq, direction);
+      sys_clk_set_mode(dom, mode, &opts);
+   }
+   else if (type == max_kind)
+   {
+      if (d->available_freqs && d->available_freqs[0])
+         opts.max_freq = sys_clk_get_next_frequency(dom, d,
+               opts.max_freq, direction);
+      else
+         opts.max_freq = sys_clk_get_next_frequency_limit(dom,
+               opts.max_freq, direction);
+      sys_clk_set_mode(dom, mode, &opts);
+   }
+   return 0;
+}
+
 static int cpu_policy_mode_change(unsigned type, const char *label,
       bool wraparound)
 {
    struct menu_state *menu_st = menu_state_get_ptr();
-   enum cpu_scaling_mode mode = get_cpu_scaling_mode(NULL);
-   if (mode != CPUSCALING_MANUAL)
-      mode++;
-   set_cpu_scaling_mode(mode, NULL);
+   enum sys_clk_mode  mode    = sys_clk_get_mode(SYS_CLK_DOMAIN_CPU, NULL);
+   /* CPU modes are contiguous in the unified enum, so plain
+    * increment is enough; stop at _MANUAL. */
+   if (mode != SYS_CLK_MODE_MANUAL)
+      mode = (enum sys_clk_mode)((int)mode + 1);
+   sys_clk_set_mode(SYS_CLK_DOMAIN_CPU, mode, NULL);
    menu_st->flags |= MENU_ST_FLAG_ENTRIES_NEED_REFRESH;
    return 0;
 }
@@ -809,34 +847,19 @@ static int cpu_policy_mode_change(unsigned type, const char *label,
 static int cpu_policy_freq_managed_tweak(unsigned type, const char *label,
       bool wraparound)
 {
-   cpu_scaling_opts_t opts;
-   enum cpu_scaling_mode mode = get_cpu_scaling_mode(&opts);
-
-   switch (type)
-   {
-      case MENU_SETTINGS_CPU_MANAGED_SET_MINFREQ:
-         opts.min_freq = get_cpu_scaling_next_frequency_limit(
-               opts.min_freq, 1);
-         set_cpu_scaling_mode(mode, &opts);
-         break;
-      case MENU_SETTINGS_CPU_MANAGED_SET_MAXFREQ:
-         opts.max_freq = get_cpu_scaling_next_frequency_limit(
-               opts.max_freq, 1);
-         set_cpu_scaling_mode(mode, &opts);
-         break;
-   }
-
-   return 0;
+   return sys_clk_left_right_managed_tweak(SYS_CLK_DOMAIN_CPU,
+         type, 1,
+         MENU_SETTINGS_CPU_MANAGED_SET_MINFREQ,
+         MENU_SETTINGS_CPU_MANAGED_SET_MAXFREQ);
 }
 
 static int cpu_policy_freq_managed_gov(unsigned type, const char *label,
       bool wraparound)
 {
-   int pidx;
-   bool refresh = false;
-   cpu_scaling_opts_t opts;
-   enum cpu_scaling_mode mode     = get_cpu_scaling_mode(&opts);
-   cpu_scaling_driver_t **drivers = get_cpu_scaling_drivers(false);
+   int                 pidx;
+   sys_clk_opts_t      opts;
+   enum sys_clk_mode   mode    = sys_clk_get_mode(SYS_CLK_DOMAIN_CPU, &opts);
+   sys_clk_driver_t  **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
 
    /* Using drivers[0] governors, should be improved */
    if (!drivers || !drivers[0])
@@ -847,23 +870,27 @@ static int cpu_policy_freq_managed_gov(unsigned type, const char *label,
       case 0:
          pidx = string_list_find_elem(drivers[0]->available_governors,
                opts.main_policy);
-         if (pidx && pidx + 1 < drivers[0]->available_governors->size)
+         /* string_list_find_elem returns a 1-based index, so the
+          * next governor lives at elems[pidx]. It exists iff pidx
+          * is non-zero (current was found) and pidx is strictly
+          * less than the list size. */
+         if (pidx && pidx < (int)drivers[0]->available_governors->size)
          {
             strlcpy(opts.main_policy,
                   drivers[0]->available_governors->elems[pidx].data,
                   sizeof(opts.main_policy));
-            set_cpu_scaling_mode(mode, &opts);
+            sys_clk_set_mode(SYS_CLK_DOMAIN_CPU, mode, &opts);
          }
          break;
       case 1:
          pidx = string_list_find_elem(drivers[0]->available_governors,
                opts.menu_policy);
-         if (pidx && pidx + 1 < drivers[0]->available_governors->size)
+         if (pidx && pidx < (int)drivers[0]->available_governors->size)
          {
             strlcpy(opts.menu_policy,
                   drivers[0]->available_governors->elems[pidx].data,
                   sizeof(opts.menu_policy));
-            set_cpu_scaling_mode(mode, &opts);
+            sys_clk_set_mode(SYS_CLK_DOMAIN_CPU, mode, &opts);
          }
          break;
    }
@@ -874,31 +901,38 @@ static int cpu_policy_freq_managed_gov(unsigned type, const char *label,
 static int cpu_policy_freq_tweak(unsigned type, const char *label,
       bool wraparound)
 {
-   cpu_scaling_driver_t **drivers = get_cpu_scaling_drivers(false);
+   sys_clk_driver_t **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
 
    if (drivers)
    {
       uint32_t next_freq;
-      unsigned policyid           = atoi(label);
+      unsigned policyid = atoi(label);
       switch (type)
       {
          case MENU_SETTINGS_CPU_POLICY_SET_MINFREQ:
-            next_freq = get_cpu_scaling_next_frequency(drivers[policyid],
+            next_freq = sys_clk_get_next_frequency(SYS_CLK_DOMAIN_CPU,
+                  drivers[policyid],
                   drivers[policyid]->min_policy_freq, 1);
-            set_cpu_scaling_min_frequency(drivers[policyid], next_freq);
+            sys_clk_set_min_frequency(SYS_CLK_DOMAIN_CPU,
+                  drivers[policyid], next_freq);
             break;
          case MENU_SETTINGS_CPU_POLICY_SET_MAXFREQ:
-            next_freq = get_cpu_scaling_next_frequency(drivers[policyid],
+            next_freq = sys_clk_get_next_frequency(SYS_CLK_DOMAIN_CPU,
+                  drivers[policyid],
                   drivers[policyid]->max_policy_freq, 1);
-            set_cpu_scaling_max_frequency(drivers[policyid], next_freq);
+            sys_clk_set_max_frequency(SYS_CLK_DOMAIN_CPU,
+                  drivers[policyid], next_freq);
             break;
          case MENU_SETTINGS_CPU_POLICY_SET_GOVERNOR:
             {
                int pidx = string_list_find_elem(drivers[policyid]->available_governors,
                      drivers[policyid]->scaling_governor);
-               if (pidx && pidx + 1 < drivers[policyid]->available_governors->size)
+               /* See cpu_policy_freq_managed_gov above for the
+                * 1-based vs 0-based reasoning. */
+               if (pidx && pidx < (int)drivers[policyid]->available_governors->size)
                {
-                  set_cpu_scaling_governor(drivers[policyid],
+                  sys_clk_set_governor(SYS_CLK_DOMAIN_CPU,
+                        drivers[policyid],
                         drivers[policyid]->available_governors->elems[pidx].data);
                }
                break;
@@ -908,17 +942,26 @@ static int cpu_policy_freq_tweak(unsigned type, const char *label,
 
    return 0;
 }
-#endif
-#ifdef HAVE_LAKKA_SWITCH
+
 static int gpu_policy_mode_change(unsigned type, const char *label,
       bool wraparound)
 {
    struct menu_state *menu_st = menu_state_get_ptr();
-   gpu_scaling_opts_t opts;
-   enum gpu_scaling_mode mode = get_gpu_scaling_mode(&opts);
-   if (mode != GPUSCALING_BALANCED)
-      mode++;
-   set_gpu_scaling_mode(mode, &opts);
+   sys_clk_opts_t     opts;
+   enum sys_clk_mode  mode    = sys_clk_get_mode(SYS_CLK_DOMAIN_GPU, &opts);
+   if (mode != SYS_CLK_MODE_BALANCED)
+   {
+      /* Step forward through the GPU's legacy display order:
+       * MANAGED -> MAX -> MIN -> BALANCED. */
+      switch (mode)
+      {
+         case SYS_CLK_MODE_MANAGED_PERFORMANCE: mode = SYS_CLK_MODE_MAX_PERFORMANCE; break;
+         case SYS_CLK_MODE_MAX_PERFORMANCE:     mode = SYS_CLK_MODE_MIN_POWER;       break;
+         case SYS_CLK_MODE_MIN_POWER:           mode = SYS_CLK_MODE_BALANCED;        break;
+         default:                                                                    break;
+      }
+   }
+   sys_clk_set_mode(SYS_CLK_DOMAIN_GPU, mode, &opts);
    menu_st->flags |= MENU_ST_FLAG_ENTRIES_NEED_REFRESH;
    return 0;
 }
@@ -926,35 +969,10 @@ static int gpu_policy_mode_change(unsigned type, const char *label,
 static int gpu_policy_freq_managed_tweak(unsigned type, const char *label,
       bool wraparound)
 {
-   bool refresh = false;
-   gpu_scaling_opts_t opts;
-   gpu_scaling_driver_t **drivers = get_gpu_scaling_drivers(false);
-   unsigned policyid = atoi(label);
-   enum gpu_scaling_mode mode = get_gpu_scaling_mode(&opts);
-
-   if (!drivers)
-     return 0 ;
-
-   switch (type)
-   {
-      case MENU_SETTINGS_GPU_MANAGED_SET_MINFREQ:
-        if((*drivers)->available_freqs)
-            opts.min_freq = get_gpu_scaling_next_frequency(drivers[policyid], opts.min_freq, 1);
-        else
-          opts.min_freq = get_gpu_scaling_next_frequency_limit(opts.min_freq, 1);
-         set_gpu_scaling_mode(mode, &opts);
-         break;
-      case MENU_SETTINGS_GPU_MANAGED_SET_MAXFREQ:
-        if((*drivers)->available_freqs) {
-           opts.max_freq = get_gpu_scaling_next_frequency(drivers[policyid], opts.max_freq, 1);
-        }
-        else
-           opts.max_freq = get_gpu_scaling_next_frequency_limit(opts.max_freq, 1);
-         set_gpu_scaling_mode(mode, &opts);
-         break;
-   }
-
-   return 0;
+   return sys_clk_left_right_managed_tweak(SYS_CLK_DOMAIN_GPU,
+         type, 1,
+         MENU_SETTINGS_GPU_MANAGED_SET_MINFREQ,
+         MENU_SETTINGS_GPU_MANAGED_SET_MAXFREQ);
 }
 #endif
 
@@ -1296,7 +1314,7 @@ static int menu_cbs_init_bind_right_compare_label(menu_file_list_cbs_t *cbs,
                BIND_ACTION_RIGHT(cbs, cpu_policy_freq_managed_gov);
                break;
             #endif
-            #ifdef HAVE_LAKKA_SWITCH
+            #ifdef HAVE_LAKKA
             case MENU_ENUM_LABEL_GPU_PERF_MODE:
                BIND_ACTION_RIGHT(cbs, gpu_policy_mode_change);
                break;
