@@ -1298,6 +1298,17 @@ MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_MENU_SETTINGS_LIST,
    "deferred_menu_settings_list"
    )
+
+#ifdef HAVE_LAKKA_SWITCH
+MSG_HASH(
+   MENU_ENUM_LABEL_DEFERRED_GPU_PERFPOWER_LIST,
+   "deferred_gpu_perfpower_list"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_DEFERRED_GPU_POLICY_ENTRY,
+   "deferred_gpu_policy_list"
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_APPICON_SETTINGS,
    "appicon_settings"
@@ -6370,6 +6381,12 @@ MSG_HASH(
    MENU_ENUM_LABEL_QUICK_MENU_SHOW_RESUME_CONTENT,
    "quick_menu_show_resume_content"
    )
+#ifdef HAVE_LAKKA_SWITCH
+MSG_HASH(
+   MENU_ENUM_LABEL_GPU_PERFPOWER,
+   "gpu_perfpower_list"
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_QUICK_MENU_SHOW_RESTART_CONTENT,
    "quick_menu_show_restart_content"
