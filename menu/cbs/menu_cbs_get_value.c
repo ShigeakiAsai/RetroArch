@@ -690,17 +690,28 @@ static size_t menu_action_cpu_freq_label(
    unsigned          policyid = atoi(path);
    sys_clk_driver_t **drivers = sys_clk_get_drivers(SYS_CLK_DOMAIN_CPU, false);
    sys_clk_driver_t  *d       = drivers[policyid];
+   uint32_t           freq;
 
    switch (type)
    {
       case MENU_SETTINGS_CPU_POLICY_SET_MINFREQ:
          strlcpy(s2, msg_hash_to_str(
                   MENU_ENUM_LABEL_VALUE_CPU_POLICY_MIN_FREQ), len2);
-         return snprintf(s, len, "%u MHz", d->min_policy_freq / 1000);
+         freq = d->min_policy_freq;
+         if (freq == 1)
+            return strlcpy(s, "Min.", len);
+         if (freq == ~0U)
+            return strlcpy(s, "Max.", len);
+         return snprintf(s, len, "%u MHz", freq / 1000);
       case MENU_SETTINGS_CPU_POLICY_SET_MAXFREQ:
          strlcpy(s2, msg_hash_to_str(
                   MENU_ENUM_LABEL_VALUE_CPU_POLICY_MAX_FREQ), len2);
-         return snprintf(s, len, "%u MHz", d->max_policy_freq / 1000);
+         freq = d->max_policy_freq;
+         if (freq == 1)
+            return strlcpy(s, "Min.", len);
+         if (freq == ~0U)
+            return strlcpy(s, "Max.", len);
+         return snprintf(s, len, "%u MHz", freq / 1000);
       case MENU_SETTINGS_CPU_POLICY_SET_GOVERNOR:
          strlcpy(s2, msg_hash_to_str(
                   MENU_ENUM_LABEL_VALUE_CPU_POLICY_GOVERNOR), len2);
