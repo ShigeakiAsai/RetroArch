@@ -933,6 +933,8 @@ void sys_clk_driver_init(enum sys_clk_domain dom)
             (unsigned)dom);
       return;
    }
+   RARCH_LOG("[sys-clk]: domain %u has usable device; enabling.\n",
+         (unsigned)dom);
    sys_clk_set_mode(dom, st->cur_mode, NULL);
 }
 
