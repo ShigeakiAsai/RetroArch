@@ -1726,6 +1726,11 @@ void drivers_init(
       gfx_display_init_first_driver(p_disp, video_is_threaded);
    }
 
+#ifdef HAVE_LAKKA
+   sys_clk_driver_init(SYS_CLK_DOMAIN_CPU);
+   sys_clk_driver_init(SYS_CLK_DOMAIN_GPU);
+#endif
+
 #ifdef HAVE_MENU
    if (flags & DRIVER_VIDEO_MASK)
    {
@@ -1770,11 +1775,6 @@ void drivers_init(
    /* Initialize MIDI driver */
    if (flags & DRIVER_MIDI_MASK)
       midi_driver_init(settings);
-
-#ifdef HAVE_LAKKA
-   sys_clk_driver_init(SYS_CLK_DOMAIN_CPU);
-   sys_clk_driver_init(SYS_CLK_DOMAIN_GPU);
-#endif
 
 #ifdef HAVE_MENU
    srand(time(NULL));
