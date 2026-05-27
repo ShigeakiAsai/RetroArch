@@ -123,7 +123,7 @@ static const sys_clk_backend_t be_cpu =
    /* .gov_powersave     */ "powersave"
 };
 
-static const sys_clk_backend_t be_gpu =
+static sys_clk_backend_t be_gpu =
 {
    /* .root              */ "",   /* resolved at runtime */
    /* .file_cur_freq     */ "cur_freq",
@@ -373,7 +373,7 @@ static bool resolve_root(sys_clk_state_t *st)
           * through the pointer; we instead write to a separate buffer
           * by casting away the pointer constness on the state's
           * backend reference. */
-/*         {
+         {
             sys_clk_backend_t *mb = (sys_clk_backend_t*)st->be;
             size_t             l;
             strlcpy(mb->root, devs->elems[i].data, sizeof(mb->root));
@@ -384,7 +384,7 @@ static bool resolve_root(sys_clk_state_t *st)
                mb->root[l + 1] = '\0';
             }
             RARCH_LOG("[sys-clk]: using GPU devfreq device %s\n", mb->root);
-         }*/
+         }
          dir_list_free(devs);
          return true;
       }
