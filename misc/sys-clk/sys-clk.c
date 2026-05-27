@@ -123,14 +123,9 @@ static const sys_clk_backend_t be_cpu =
    /* .gov_powersave     */ "powersave"
 };
 
-/* GPU backend: Tegra devfreq on Lakka Switch, generic devfreq elsewhere. */
 static const sys_clk_backend_t be_gpu =
 {
-#ifdef HAVE_LAKKA_SWITCH
-   /* .root              */ "/sys/devices/gpu.0/devfreq/57000000.gpu/",
-#else
    /* .root              */ "",   /* resolved at runtime */
-#endif
    /* .file_cur_freq     */ "cur_freq",
    /* .file_min_policy   */ "min_freq",
    /* .file_max_policy   */ "max_freq",
@@ -351,7 +346,6 @@ static bool resolve_root(sys_clk_state_t *st)
    if (st->be->root[0])
       return path_is_directory(st->be->root);
 
-#if defined(HAVE_LAKKA) && !defined(HAVE_LAKKA_SWITCH)
    if (st == &g_state[SYS_CLK_DOMAIN_GPU])
    {
       int                 i;
@@ -394,7 +388,6 @@ static bool resolve_root(sys_clk_state_t *st)
       }
       dir_list_free(devs);
    }
-#endif
    return false;
 }
 
