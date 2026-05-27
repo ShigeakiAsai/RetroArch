@@ -356,6 +356,8 @@ static bool resolve_root(sys_clk_state_t *st)
       dir_list_sort(devs, false);
       for (i = 0; i < (int)devs->size; i++)
       {
+         if (strstr(devs->elems[i].data, ".gpu") == NULL)
+            continue;
          char probe[PATH_MAX_LENGTH];
          fill_pathname_join(probe, devs->elems[i].data,
                st->be->file_cur_freq, sizeof(probe));
